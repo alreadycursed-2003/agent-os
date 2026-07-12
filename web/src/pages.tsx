@@ -205,15 +205,131 @@ export function McpPage() {
 
 // ---------------- Plugins ----------------
 
+interface Preset {
+  repo: string
+  name: string
+  title: string
+  blurb: string
+  added: boolean
+}
+
+interface CatalogPlugin {
+  name: string
+  description: string
+  category: string
+}
+
+function MarketplaceCard({
+  m,
+  onAction,
+  refresh,
+}: {
+  m: Preset
+  onAction: (r: CliResult) => void
+  refresh: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [plugins, setPlugins] = useState<CatalogPlugin[] | null>(null)
+  const [filter, setFilter] = useState('')
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const toggle = () => {
+    setOpen(!open)
+    if (!plugins) {
+      get(`/api/marketplaces/catalog?repo=${encodeURIComponent(m.repo)}`)
+        .then((c) => setPlugins(c.plugins))
+        .catch(() => setPlugins([]))
+    }
+  }
+
+  const install = async (p: CatalogPlugin) => {
+    setBusy(p.name)
+    try {
+      onAction(
+        await send('/api/plugins/install', 'POST', {
+          plugin: `${p.name}@${m.name}`,
+          ensureRepo: m.repo,
+        })
+      )
+      refresh()
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const q = filter.toLowerCase()
+  const visible = (plugins ?? []).filter(
+    (p) => !q || p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
+  )
+
+  return (
+    <div className="mkt-card">
+      <div className="mkt-head" onClick={toggle}>
+        <div>
+          <div className="mkt-title">
+            {m.title} {m.added && <span className="note-ok">● added</span>}
+          </div>
+          <div className="mkt-blurb">
+            {m.blurb} · <code>{m.repo}</code>
+          </div>
+        </div>
+        <span className="mkt-caret">{open ? '▾' : '▸'}</span>
+      </div>
+      {open && (
+        <div className="mkt-body">
+          {plugins === null && <div className="dock-empty">Loading catalog…</div>}
+          {plugins?.length === 0 && <div className="dock-empty">Could not load this catalog.</div>}
+          {plugins && plugins.length > 0 && (
+            <>
+              <input
+                className="mkt-search"
+                placeholder={`Search ${plugins.length} plugins…`}
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+              />
+              <div className="mkt-list">
+                {visible.slice(0, 60).map((p) => (
+                  <div key={p.name} className="mkt-plugin">
+                    <div style={{ minWidth: 0 }}>
+                      <div className="p-name">
+                        {p.name} {p.category && <span className="p-cat">{p.category}</span>}
+                      </div>
+                      <div className="p-desc">{p.description || '—'}</div>
+                    </div>
+                    <button
+                      className="btn"
+                      disabled={busy !== null}
+                      onClick={() => install(p)}
+                    >
+                      {busy === p.name ? 'Installing…' : 'Install'}
+                    </button>
+                  </div>
+                ))}
+                {visible.length > 60 && (
+                  <div className="dock-empty" style={{ padding: 8 }}>
+                    {visible.length - 60} more — refine the search.
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function PluginsPage() {
-  const [lists, setLists] = useState<{ plugins: CliResult; marketplaces: CliResult } | null>(null)
+  const [presets, setPresets] = useState<Preset[]>([])
+  const [installed, setInstalled] = useState<CliResult | null>(null)
   const [action, setAction] = useState<CliResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [repo, setRepo] = useState('')
   const [plugin, setPlugin] = useState('')
 
   const load = useCallback(() => {
-    get('/api/plugins').then(setLists).catch(() => {})
+    get('/api/marketplaces').then((r) => setPresets(r.presets)).catch(() => {})
+    get('/api/plugins').then((r) => setInstalled(r.plugins)).catch(() => {})
   }, [])
   useEffect(load, [load])
 
@@ -231,21 +347,29 @@ export function PluginsPage() {
     <div className="page">
       <h1>Plugins</h1>
       <p className="sub">
-        Claude Code plugins bundle skills, agents, and hooks. Add a marketplace (GitHub repo), then
-        install plugins from it — same as <code>/plugin</code> inside Claude Code.
+        Browse marketplaces, see every plugin and skill pack they carry, and install with one
+        click — same as <code>/plugin</code> inside Claude Code, applied to your whole machine.
       </p>
+
+      <section>
+        <h3>Marketplace catalog</h3>
+        {presets.map((m) => (
+          <MarketplaceCard key={m.repo} m={m} onAction={setAction} refresh={load} />
+        ))}
+        <CliOut r={action} />
+      </section>
+
       <section>
         <h3>Installed plugins</h3>
-        <CliOut r={lists?.plugins ?? null} />
-        <h3 style={{ marginTop: 14 }}>Marketplaces</h3>
-        <CliOut r={lists?.marketplaces ?? null} />
+        <CliOut r={installed} />
         <button className="btn" style={{ marginTop: 8 }} onClick={load}>Refresh</button>
       </section>
+
       <section>
-        <h3>Add marketplace</h3>
+        <h3>Manual</h3>
         <div className="form-row">
           <div style={{ flex: 1 }}>
-            <label>GitHub repo or URL</label>
+            <label>Add marketplace (GitHub repo or URL)</label>
             <input
               value={repo}
               style={{ width: '100%' }}
@@ -261,14 +385,13 @@ export function PluginsPage() {
             Add
           </button>
         </div>
-        <h3>Install / uninstall plugin</h3>
         <div className="form-row">
           <div style={{ flex: 1 }}>
-            <label>Plugin (name or name@marketplace)</label>
+            <label>Install / uninstall by name (name@marketplace)</label>
             <input
               value={plugin}
               style={{ width: '100%' }}
-              placeholder="my-plugin@owner-repo"
+              placeholder="my-plugin@marketplace-name"
               onChange={(e) => setPlugin(e.target.value)}
             />
           </div>
@@ -287,7 +410,6 @@ export function PluginsPage() {
             Uninstall
           </button>
         </div>
-        <CliOut r={action} />
       </section>
     </div>
   )
@@ -405,9 +527,22 @@ interface StatusInfo {
 export function StatusPage() {
   const [s, setS] = useState<StatusInfo | null>(null)
   const [err, setErr] = useState('')
-  useEffect(() => {
+  const [loginMsg, setLoginMsg] = useState('')
+  const load = useCallback(() => {
     get('/api/status').then(setS).catch((e) => setErr(e.message))
   }, [])
+  useEffect(load, [load])
+
+  const connect = async () => {
+    try {
+      await send('/api/auth/login', 'POST')
+      setLoginMsg(
+        'A terminal opened running the Claude Code login. It redirects you to claude.ai — sign in with your Claude account, finish the flow, then come back and hit Re-check.'
+      )
+    } catch (e) {
+      setLoginMsg(`Could not launch login: ${(e as Error).message}`)
+    }
+  }
 
   return (
     <div className="page">
@@ -423,7 +558,17 @@ export function StatusPage() {
                 {s.claude} {s.claudeOk ? <span className="note-ok">● ok</span> : <span className="note-err">● problem</span>}
               </td>
             </tr>
-            <tr><td>Auth</td><td>Uses whichever account is logged in via <code>claude login</code> — no API key involved.</td></tr>
+            <tr>
+              <td>Account</td>
+              <td>
+                Runs on whichever Claude account is connected on this machine — no API key.
+                <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button className="btn" onClick={connect}>Connect Claude account</button>
+                  <button className="btn btn-ghost" onClick={load}>Re-check</button>
+                </div>
+                {loginMsg && <p style={{ marginBottom: 0 }} className="note-ok">{loginMsg}</p>}
+              </td>
+            </tr>
             <tr><td>Node (backend)</td><td>{s.node}</td></tr>
             <tr><td>Platform</td><td>{s.platform}</td></tr>
             <tr><td>Settings file</td><td>{s.settingsPath}</td></tr>

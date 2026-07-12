@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import http from 'node:http';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -141,6 +142,63 @@ app.delete('/api/mcp/:name', async (req, res) => {
   res.json(await claude(['mcp', 'remove', req.params.name]));
 });
 
+// ---- marketplace catalog ----
+const PRESET_MARKETPLACES = [
+  { repo: 'anthropics/claude-code', name: 'claude-code-plugins', title: 'Anthropic official', blurb: 'Plugins from the Claude Code team' },
+  { repo: 'anthropics/skills', name: 'anthropic-agent-skills', title: 'Anthropic Agent Skills', blurb: 'Official skills: docs, spreadsheets, PDFs and more' },
+  { repo: 'wshobson/agents', name: 'claude-code-workflows', title: 'Claude Code Workflows', blurb: 'Large collection of agents and workflow plugins' },
+  { repo: 'obra/superpowers-marketplace', name: 'superpowers-marketplace', title: 'Superpowers', blurb: 'Skill-driven engineering workflows' },
+  { repo: 'ananddtyagi/claude-code-marketplace', name: 'cc-marketplace', title: 'CC Marketplace', blurb: 'Community marketplace, hundreds of entries' },
+  { repo: 'EveryInc/every-marketplace', name: 'compound-engineering-plugin', title: 'Every — Compound Engineering', blurb: 'Compound engineering plugins from Every' },
+  { repo: 'jeremylongshore/claude-code-plugins', name: 'claude-code-plugins-plus', title: 'Plugins Plus', blurb: '900+ community plugins across every category' },
+];
+
+const catalogCache = new Map(); // repo -> { at, data }
+
+app.get('/api/marketplaces', async (_req, res) => {
+  const list = await claude(['plugin', 'marketplace', 'list']);
+  const installedText = `${list.stdout}\n${list.stderr}`;
+  res.json({
+    presets: PRESET_MARKETPLACES.map((m) => ({
+      ...m,
+      added: installedText.includes(m.name) || installedText.includes(m.repo),
+    })),
+    raw: installedText.trim(),
+  });
+});
+
+app.get('/api/marketplaces/catalog', async (req, res) => {
+  const repo = String(req.query.repo ?? '');
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return res.status(400).json({ error: 'bad repo' });
+  const hit = catalogCache.get(repo);
+  if (hit && Date.now() - hit.at < 10 * 60 * 1000) return res.json(hit.data);
+  try {
+    let data = null;
+    for (const branch of ['main', 'master']) {
+      const r = await fetch(
+        `https://raw.githubusercontent.com/${repo}/${branch}/.claude-plugin/marketplace.json`
+      );
+      if (r.ok) {
+        data = await r.json();
+        break;
+      }
+    }
+    if (!data) return res.status(404).json({ error: 'marketplace.json not found' });
+    const out = {
+      name: data.name ?? repo,
+      plugins: (data.plugins ?? []).map((p) => ({
+        name: p.name,
+        description: p.description ?? '',
+        category: p.category ?? '',
+      })),
+    };
+    catalogCache.set(repo, { at: Date.now(), data: out });
+    res.json(out);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
 app.get('/api/plugins', async (_req, res) => {
   const plugins = await claude(['plugin', 'list']);
   const marketplaces = await claude(['plugin', 'marketplace', 'list']);
@@ -154,15 +212,36 @@ app.post('/api/plugins/marketplace', async (req, res) => {
 });
 
 app.post('/api/plugins/install', async (req, res) => {
-  const { plugin } = req.body ?? {};
+  const { plugin, ensureRepo } = req.body ?? {};
   if (!plugin) return res.status(400).json({ error: 'plugin required' });
-  res.json(await claude(['plugin', 'install', plugin], 120000));
+  if (ensureRepo) {
+    // idempotent: adding an already-added marketplace fails harmlessly
+    await claude(['plugin', 'marketplace', 'add', ensureRepo], 120000);
+  }
+  res.json(await claude(['plugin', 'install', plugin], 180000));
 });
 
 app.post('/api/plugins/uninstall', async (req, res) => {
   const { plugin } = req.body ?? {};
   if (!plugin) return res.status(400).json({ error: 'plugin required' });
   res.json(await claude(['plugin', 'uninstall', plugin], 120000));
+});
+
+// ---- auth: launch Claude Code's own OAuth login flow ----
+app.post('/api/auth/login', (_req, res) => {
+  // Opens a terminal running `claude setup-token`, which redirects the user
+  // to claude.ai sign-in and stores the credential for this machine.
+  try {
+    const child = spawn(
+      'cmd',
+      ['/c', 'start', 'Claude Code login', 'powershell', '-NoExit', '-Command', 'claude setup-token'],
+      { detached: true, stdio: 'ignore', windowsHide: false }
+    );
+    child.unref();
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ---- agent definitions on disk ----

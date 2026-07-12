@@ -8,7 +8,9 @@ Drag-and-drop GUI for building and running multi-agent workflows on **Claude Cod
 
 Done:
 - 🎮 Canvas builder (React Flow): add agents, drag skill chips onto agent cards, wire edges — left skill palette, right inspector, toolbar, live mission log
-- 🗂 Tabs for the Claude Code surfaces: **Usage** (token ledger per run), **MCP** (add/remove servers via `claude mcp`), **Plugins** (marketplaces + install via `claude plugin`), **Agents** (every agent definition on disk), **Settings** (edit `~/.claude/settings.json` with auto-backup), **Status** (CLI health)
+- 🗂 Tabs for the Claude Code surfaces: **Usage** (token ledger per run), **MCP** (add/remove servers via `claude mcp`), **Plugins** (marketplaces + install via `claude plugin`), **Agents** (every agent definition on disk), **Settings** (edit `~/.claude/settings.json` with auto-backup), **Status** (CLI health + Connect Claude account)
+- 🛒 Marketplace catalog: 7 curated marketplaces (Anthropic official, Anthropic Agent Skills, Claude Code Workflows, Superpowers, CC Marketplace, Every, Plugins Plus — 1,300+ plugins combined) browsable with search and one-click install
+- 🔑 Connect account: Status tab button launches Claude Code's own OAuth login (`claude setup-token`), which redirects to claude.ai sign-in — no API key ever
 - 🤖 Per-agent config: system prompt, model (auto/sonnet/opus/haiku), allowed tools, permission mode, max turns
 - ⚡ Skill forge: create/edit skills, equip per agent (inlined into system prompt + exported as `.claude/skills/`)
 - 🔁 Loops: self-loop per agent (repeat ×N, stop-when-output-contains) and loop-back edges between agents (max loops + until-condition)

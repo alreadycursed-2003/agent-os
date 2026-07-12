@@ -530,6 +530,69 @@ pre.console {
 .note-ok { color: var(--ok); font-size: 14px; }
 .note-err { color: var(--err); font-size: 14px; }
 
+/* marketplace catalog */
+.mkt-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+.mkt-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.mkt-head:hover .mkt-title { color: var(--accent); }
+.mkt-title { font-size: 15px; font-weight: 700; transition: color 0.15s var(--ease); }
+.mkt-title .note-ok { font-size: 12px; margin-left: 6px; }
+.mkt-blurb { font-size: 13px; color: var(--ink-mute); margin-top: 2px; }
+.mkt-caret { margin-left: auto; color: var(--ink-mute); }
+.mkt-body { border-top: 1px solid var(--line); padding: 12px 14px; }
+.mkt-search {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  padding: 7px 10px;
+  outline: none;
+  margin-bottom: 10px;
+}
+.mkt-search:focus { border-color: var(--accent); }
+.mkt-list { max-height: 420px; overflow-y: auto; }
+.mkt-plugin {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.mkt-plugin:last-child { border-bottom: none; }
+.mkt-plugin .p-name { font-weight: 700; font-size: 14px; }
+.mkt-plugin .p-cat {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-mute);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 7px;
+  margin-left: 6px;
+}
+.mkt-plugin .p-desc {
+  font-size: 13px;
+  color: var(--ink-mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60ch;
+}
+.mkt-plugin .btn { margin-left: auto; flex: none; }
+
 details.agent-def {
   background: var(--surface);
   border: 1px solid var(--line);
