@@ -70,4 +70,6 @@ claude -p --output-format stream-json --system-prompt … --allowedTools … --m
 
 The executor walks the graph topologically, runs each agent as a headless Claude Code call in the workflow's workspace dir, pipes results downstream, and honors self-loops and loop-back edges (capped at 25 iterations).
 
-> **Note:** personal tool for your own machine/account. Subscription auth must not back a multi-user or resold service. Runs consume your Pro usage window — agents execute sequentially for that reason.
+> **Note:** personal tool for your own machine/account. Each user must bring their own Claude Code subscription login — no credentials are included or shared by this app. Subscription auth must not back a multi-user or resold service. Runs consume your Pro usage window — agents execute sequentially for that reason.
+>
+> Not affiliated with or endorsed by Anthropic; works with the Claude Code CLI you install and log into yourself. MIT licensed.
