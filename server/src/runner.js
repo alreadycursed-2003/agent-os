@@ -186,7 +186,13 @@ export function startRun({ workflow, skills, prompt, emit }) {
             run,
             emit,
           });
-          emit({ type: 'node_usage', nodeId: node.id, usage: result.usage });
+          emit({
+            type: 'node_usage',
+            nodeId: node.id,
+            name: node.name,
+            model: node.model || 'inherit',
+            usage: result.usage,
+          });
           if (repeat.until && result.result.includes(repeat.until)) break;
         }
 

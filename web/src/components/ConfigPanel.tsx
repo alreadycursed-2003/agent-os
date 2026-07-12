@@ -13,9 +13,7 @@ export function AgentConfig({ node }: { node: Node<AgentData> }) {
 
   return (
     <div className="cfg dock-scroll" style={{ flex: 1 }}>
-      <h2>
-        <span>{d.avatar}</span> AGENT CONFIG
-      </h2>
+      <h2>{d.avatar} Agent config</h2>
       <label>Description (for subagent routing)</label>
       <input
         type="text"
@@ -95,7 +93,7 @@ export function AgentConfig({ node }: { node: Node<AgentData> }) {
       />
       <div style={{ marginTop: 14 }}>
         <button className="btn btn-stop" onClick={() => removeAgent(node.id)}>
-          ✖ Dismiss Agent
+          Dismiss agent
         </button>
       </div>
     </div>
@@ -112,9 +110,7 @@ export function EdgeConfigPanel({
   const d = (edge.data ?? {}) as EdgeConfig
   return (
     <div className="cfg dock-scroll">
-      <h2>
-        <span>🔗</span> LINK CONFIG
-      </h2>
+      <h2>Link config</h2>
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, textTransform: 'none' }}>
         <input
           type="checkbox"
@@ -159,9 +155,7 @@ export function HarnessConfig({
 }) {
   return (
     <div className="cfg" style={{ padding: '0 14px 12px' }}>
-      <h2 style={{ margin: '12px 0 4px' }}>
-        <span>🛰️</span> HARNESS
-      </h2>
+      <h2 style={{ margin: '12px 0 4px' }}>Harness</h2>
       <label>MCP config (JSON, passed to every agent)</label>
       <textarea
         rows={4}

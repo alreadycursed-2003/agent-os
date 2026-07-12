@@ -13,15 +13,13 @@ export function SkillDock({
 }) {
   return (
     <>
-      <h2>
-        <span>⚡</span> SKILL INVENTORY
-      </h2>
+      <h2>Skill inventory</h2>
       <button className="btn forge-btn" onClick={onForge}>
-        + Forge Skill
+        + Forge skill
       </button>
       <div className="dock-scroll">
         {skills.length === 0 && (
-          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+          <div className="dock-empty">
             No skills yet. Forge one, then drag it onto an agent card to equip.
           </div>
         )}
@@ -36,7 +34,7 @@ export function SkillDock({
             }}
             title="Drag onto an agent to equip"
           >
-            <span style={{ fontSize: 18 }}>⚡</span>
+            <span className="s-dot" />
             <div style={{ minWidth: 0 }}>
               <div className="s-name">{s.name}</div>
               <div className="s-desc">{s.description || '—'}</div>

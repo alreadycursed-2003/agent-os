@@ -7,6 +7,7 @@ const DATA_DIR = path.join(__dirname, '..', 'data');
 const FILES = {
   workflows: path.join(DATA_DIR, 'workflows.json'),
   skills: path.join(DATA_DIR, 'skills.json'),
+  usage: path.join(DATA_DIR, 'usage.json'),
 };
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -56,5 +57,14 @@ export const store = {
   },
   deleteSkill(name) {
     save(FILES.skills, this.listSkills().filter((s) => s.name !== name));
+  },
+
+  listUsage() {
+    return load(FILES.usage, []);
+  },
+  appendUsage(record) {
+    const all = load(FILES.usage, []);
+    all.push(record);
+    save(FILES.usage, all.slice(-1000));
   },
 };

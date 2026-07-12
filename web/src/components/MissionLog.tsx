@@ -10,11 +10,17 @@ export interface NodeLog {
 export function MissionLog({
   logs,
   runState,
+  running,
 }: {
   logs: Map<string, NodeLog>
   runState: string
+  running: boolean
 }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (running) setOpen(true)
+  }, [running])
   const [active, setActive] = useState<string | null>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
 
@@ -30,7 +36,7 @@ export function MissionLog({
   return (
     <div className={`mission-log ${open ? '' : 'collapsed'}`}>
       <div className="log-bar" onClick={() => setOpen(!open)}>
-        <span className="title">▤ MISSION LOG</span>
+        <span className="title">Mission log</span>
         <span className="run-state">{runState}</span>
         <div className="log-tabs" onClick={(e) => e.stopPropagation()}>
           {ids.map((id) => {

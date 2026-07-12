@@ -4,7 +4,6 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   addEdge,
   useNodesState,
   useEdgesState,
@@ -23,9 +22,21 @@ import { SkillDock } from './components/SkillDock'
 import { SkillEditor } from './components/SkillEditor'
 import { MissionLog, type NodeLog } from './components/MissionLog'
 import { AgentConfig, EdgeConfigPanel, HarnessConfig } from './components/ConfigPanel'
+import { UsagePage, McpPage, PluginsPage, AgentsPage, SettingsPage, StatusPage } from './pages'
 
 const WORKFLOW_ID = 'main'
 const nodeTypes = { agent: AgentNode }
+
+const TABS = [
+  ['canvas', 'Canvas'],
+  ['usage', 'Usage'],
+  ['mcp', 'MCP'],
+  ['plugins', 'Plugins'],
+  ['agents', 'Agents'],
+  ['settings', 'Settings'],
+  ['status', 'Status'],
+] as const
+type Tab = (typeof TABS)[number][0]
 
 let agentSeq = 0
 const freshAgent = (): AgentData => ({
@@ -54,7 +65,13 @@ export default function App() {
   const [mcpConfig, setMcpConfig] = useState('')
   const [selNode, setSelNode] = useState<string | null>(null)
   const [selEdge, setSelEdge] = useState<string | null>(null)
+  const [tab, setTab] = useState<Tab>('canvas')
   const loaded = useRef(false)
+
+  // edges glow with motion only while a mission is actually running
+  useEffect(() => {
+    setEdges((es) => es.map((e) => ({ ...e, animated: !!runId })))
+  }, [runId, setEdges])
 
   // ---- load persisted state ----
   useEffect(() => {
@@ -262,79 +279,127 @@ export default function App() {
           <div className="logo">
             ⬢ AGENT <em>OS</em>
           </div>
-          <input
-            className="mission-input"
-            placeholder="Type the mission… (what should the squad do?)"
-            value={mission}
-            onChange={(e) => setMission(e.target.value)}
-          />
-          <div className="spacer" />
-          <button className="btn" onClick={generateFiles}>
-            ⚒ Forge Files
-          </button>
-          {runId ? (
-            <button className="btn btn-stop" onClick={abort}>
-              ■ Abort
-            </button>
-          ) : (
-            <button className="btn btn-run" disabled={!nodes.length} onClick={launch}>
-              ▶ Run
-            </button>
-          )}
+          <nav className="nav-tabs">
+            {TABS.map(([id, label]) => (
+              <button
+                key={id}
+                className={`nav-tab ${tab === id ? 'active' : ''}`}
+                onClick={() => setTab(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
         </header>
 
-        <div className="mid">
-          <div className="board">
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              nodeTypes={nodeTypes}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              onSelectionChange={({ nodes: sn, edges: se }) => {
-                setSelNode(sn[0]?.id ?? null)
-                setSelEdge(se[0]?.id ?? null)
-              }}
-              fitView
-              deleteKeyCode={['Delete', 'Backspace']}
-              proOptions={{ hideAttribution: true }}
-            >
-              <Background variant={BackgroundVariant.Lines} gap={42} color="rgba(56,189,248,0.06)" />
-              <Controls />
-              <MiniMap
-                pannable
-                zoomable
-                style={{ background: 'rgba(10,15,28,0.9)' }}
-                nodeColor="#164e63"
-                maskColor="rgba(7,11,20,0.7)"
-              />
-            </ReactFlow>
-            <button className="recruit-fab" onClick={addAgent}>
-              + RECRUIT AGENT
-            </button>
-          </div>
+        <div className="stage">
+          {tab !== 'canvas' &&
+            {
+              usage: <UsagePage />,
+              mcp: <McpPage />,
+              plugins: <PluginsPage />,
+              agents: <AgentsPage />,
+              settings: <SettingsPage />,
+              status: <StatusPage />,
+            }[tab]}
 
-          <aside className="dock">
-            {selectedNode ? (
-              <AgentConfig node={selectedNode} />
-            ) : selectedEdge ? (
-              <EdgeConfigPanel edge={selectedEdge} onChange={updateEdge} />
-            ) : (
-              <>
+          <div className="canvas-tab" style={{ display: tab === 'canvas' ? 'flex' : 'none' }}>
+            <div className="toolbar">
+              <button className="btn" onClick={addAgent}>
+                + Add agent
+              </button>
+              <input
+                className="mission-input"
+                placeholder="Mission for the squad, e.g. “Research X and write a summary”"
+                value={mission}
+                onChange={(e) => setMission(e.target.value)}
+              />
+              <div className="spacer" />
+              <button className="btn btn-ghost" onClick={generateFiles} title="Export .claude/agents + skills">
+                Forge files
+              </button>
+              {runId ? (
+                <button className="btn btn-stop" onClick={abort}>
+                  ■ Abort
+                </button>
+              ) : (
+                <button className="btn btn-run" disabled={!nodes.length} onClick={launch}>
+                  ▶ Run
+                </button>
+              )}
+            </div>
+
+            <div className="work">
+              <aside className="panel panel-left">
                 <SkillDock
                   skills={skills}
                   onForge={() => setEditing('new')}
                   onEdit={(s) => setEditing(s)}
                   onDelete={deleteSkill}
                 />
-                <HarnessConfig mcpConfig={mcpConfig} onMcp={setMcpConfig} />
-              </>
-            )}
-          </aside>
+              </aside>
+
+              <div className="board">
+                {nodes.length === 0 && (
+                  <div className="board-empty">
+                    <div className="empty-card">
+                      <strong>Build your squad</strong>
+                      <p>
+                        Add an agent, give it a prompt, drag skills onto it from the left, wire
+                        agents together, then run the mission.
+                      </p>
+                      <button className="btn btn-run" onClick={addAgent}>
+                        + Add your first agent
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <ReactFlow
+                  nodes={nodes}
+                  edges={edges}
+                  nodeTypes={nodeTypes}
+                  onNodesChange={onNodesChange}
+                  onEdgesChange={onEdgesChange}
+                  onConnect={onConnect}
+                  onSelectionChange={({ nodes: sn, edges: se }) => {
+                    setSelNode(sn[0]?.id ?? null)
+                    setSelEdge(se[0]?.id ?? null)
+                  }}
+                  fitView
+                  deleteKeyCode={['Delete', 'Backspace']}
+                  proOptions={{ hideAttribution: true }}
+                >
+                  <Background
+                    variant={BackgroundVariant.Dots}
+                    gap={24}
+                    size={1.5}
+                    color="oklch(0.32 0.02 252)"
+                  />
+                  <Controls position="bottom-right" />
+                </ReactFlow>
+              </div>
+
+              <aside className="panel panel-right">
+                {selectedNode ? (
+                  <AgentConfig node={selectedNode} />
+                ) : selectedEdge ? (
+                  <EdgeConfigPanel edge={selectedEdge} onChange={updateEdge} />
+                ) : (
+                  <>
+                    <h2>Inspector</h2>
+                    <div className="dock-empty" style={{ padding: '0 14px' }}>
+                      Select an agent to edit its model, tools, permissions and loops. Select a
+                      connection to make it a loop.
+                    </div>
+                    <HarnessConfig mcpConfig={mcpConfig} onMcp={setMcpConfig} />
+                  </>
+                )}
+              </aside>
+            </div>
+          </div>
         </div>
 
-        <MissionLog logs={logs} runState={runState} />
+        <MissionLog logs={logs} runState={runState} running={!!runId} />
       </div>
 
       {editing !== null && (
@@ -352,7 +417,6 @@ function decorateEdge(e: Omit<Edge, 'className'> & { data?: EdgeConfig }): Edge 
   const loop = !!e.data?.loop
   return {
     ...e,
-    animated: true,
     className: loop ? 'edge-loop' : '',
     label: loop ? `🔁 ×${e.data?.maxLoops ?? 3}` : undefined,
   }
