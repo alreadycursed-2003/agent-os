@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { SquadTemplate } from './templates'
+import type { SquadTemplate, RoleDef } from './templates'
 
 interface CliResult {
   ok: boolean
@@ -472,11 +472,16 @@ export function AgentsPage() {
 export function TemplatePage({
   t,
   onDeploy,
+  library,
+  onAddRole,
 }: {
   t: SquadTemplate
   onDeploy: (t: SquadTemplate) => Promise<void>
+  library?: RoleDef[]
+  onAddRole?: (r: RoleDef) => void
 }) {
   const [busy, setBusy] = useState(false)
+  const [addedRole, setAddedRole] = useState('')
 
   const deploy = async () => {
     setBusy(true)
@@ -536,6 +541,51 @@ export function TemplatePage({
             .join('\n')}
         </pre>
       </section>
+      {library && onAddRole && (
+        <section>
+          <h3>Role library — more agents you can create</h3>
+          <p className="sub">
+            Individual roles beyond the default org chart. Add drops the agent onto whichever
+            workflow is open on the Canvas — wire it in however you want.
+            {addedRole && <span className="note-ok"> Added {addedRole} to the canvas.</span>}
+          </p>
+          {[...new Set(library.map((r) => r.category))].map((cat) => (
+            <div key={cat}>
+              <h3 style={{ margin: '16px 0 8px', color: 'var(--ink-mute)' }}>{cat}</h3>
+              <div className="tmpl-grid">
+                {library
+                  .filter((r) => r.category === cat)
+                  .map((r) => (
+                    <div key={r.data.name} className="tmpl-card">
+                      <div className="tmpl-head">
+                        <span className="tmpl-avatar">{r.data.avatar}</span>
+                        <div>
+                          <div className="tmpl-name">{r.data.name}</div>
+                          <div className="tmpl-role">{r.role}</div>
+                        </div>
+                      </div>
+                      <p className="tmpl-prompt">{r.data.prompt}</p>
+                      <div className="tmpl-meta" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ flex: 1 }}>
+                          {r.data.tools.length ? `tools: ${r.data.tools.join(', ')}` : 'pure reasoning'}
+                        </span>
+                        <button
+                          className="btn"
+                          onClick={() => {
+                            onAddRole(r)
+                            setAddedRole(r.data.name)
+                          }}
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
     </div>
   )
 }

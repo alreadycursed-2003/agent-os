@@ -23,7 +23,15 @@ import { SkillEditor } from './components/SkillEditor'
 import { MissionLog, type NodeLog } from './components/MissionLog'
 import { AgentConfig, EdgeConfigPanel, HarnessConfig } from './components/ConfigPanel'
 import { UsagePage, McpPage, PluginsPage, AgentsPage, SettingsPage, StatusPage, TemplatePage } from './pages'
-import { TEMPLATES, type SquadTemplate } from './templates'
+import { TEMPLATES, ROLE_LIBRARY, type SquadTemplate, type RoleDef, type AgentSpec } from './templates'
+import { AgentPicker } from './components/AgentPicker'
+
+const ALL_ROLES: RoleDef[] = [
+  ...TEMPLATES.flatMap((t) =>
+    t.nodes.map((n) => ({ category: t.title, role: n.role, data: n.data }))
+  ),
+  ...ROLE_LIBRARY,
+]
 
 const nodeTypes = { agent: AgentNode }
 
@@ -70,6 +78,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('canvas')
   const [wfId, setWfId] = useState('main')
   const [wfList, setWfList] = useState<string[]>(['main'])
+  const [pickerOpen, setPickerOpen] = useState(false)
   const loaded = useRef(false)
 
   // edges glow with motion only while a mission is actually running
@@ -227,7 +236,7 @@ export default function App() {
     [setNodes, setEdges]
   )
 
-  const addAgent = () => {
+  const addAgent = (spec?: AgentSpec) => {
     const id = `agent-${Date.now().toString(36)}`
     setNodes((ns) => [
       ...ns,
@@ -235,9 +244,14 @@ export default function App() {
         id,
         type: 'agent',
         position: { x: 120 + ns.length * 60, y: 120 + (ns.length % 4) * 90 },
-        data: freshAgent(),
+        data: spec ? { ...spec, status: 'idle' as const } : freshAgent(),
       },
     ])
+  }
+
+  const addRoleFromLibrary = (r: RoleDef) => {
+    addAgent(r.data)
+    setTab('canvas')
   }
 
   const onConnect = useCallback(
@@ -358,7 +372,14 @@ export default function App() {
           {tab !== 'canvas' &&
             {
               council: <TemplatePage t={TEMPLATES[0]} onDeploy={deployTemplate} />,
-              org: <TemplatePage t={TEMPLATES[1]} onDeploy={deployTemplate} />,
+              org: (
+                <TemplatePage
+                  t={TEMPLATES[1]}
+                  onDeploy={deployTemplate}
+                  library={ROLE_LIBRARY}
+                  onAddRole={addRoleFromLibrary}
+                />
+              ),
               usage: <UsagePage />,
               mcp: <McpPage />,
               plugins: <PluginsPage />,
@@ -381,7 +402,7 @@ export default function App() {
                   </option>
                 ))}
               </select>
-              <button className="btn" onClick={addAgent}>
+              <button className="btn" onClick={() => setPickerOpen(true)}>
                 + Add agent
               </button>
               <input
@@ -430,7 +451,7 @@ export default function App() {
                         together, then run the mission. Or deploy a ready squad from the Council or
                         Org tab.
                       </p>
-                      <button className="btn btn-run" onClick={addAgent}>
+                      <button className="btn btn-run" onClick={() => setPickerOpen(true)}>
                         + Add your first agent
                       </button>
                     </div>
@@ -489,6 +510,17 @@ export default function App() {
           initial={editing === 'new' ? null : editing}
           onSave={saveSkill}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {pickerOpen && (
+        <AgentPicker
+          roles={ALL_ROLES}
+          onPick={(r) => {
+            if (r) addAgent(r.data)
+            else addAgent()
+            setPickerOpen(false)
+          }}
+          onClose={() => setPickerOpen(false)}
         />
       )}
     </BoardCtx.Provider>
