@@ -3,9 +3,10 @@ import type { AgentData, EdgeConfig } from '../types'
 import { ALL_TOOLS, MODELS, PERMISSION_MODES } from '../types'
 import { useBoard } from '../ctx'
 
-export function AgentConfig({ node }: { node: Node<AgentData> }) {
+export function AgentConfig({ node, allSkills }: { node: Node<AgentData>; allSkills: string[] }) {
   const { updateAgent, removeAgent } = useBoard()
   const d = node.data
+  const unequipped = allSkills.filter((s) => !d.skills.includes(s))
   const toggleTool = (t: string) =>
     updateAgent(node.id, {
       tools: d.tools.includes(t) ? d.tools.filter((x) => x !== t) : [...d.tools, t],
@@ -40,6 +41,37 @@ export function AgentConfig({ node }: { node: Node<AgentData> }) {
           </label>
         ))}
       </div>
+      <label>Skills</label>
+      <div className="slot-row" style={{ marginTop: 2 }}>
+        {d.skills.map((s) => (
+          <span key={s} className="slot filled">
+            {s}
+            <button
+              title="Unequip"
+              onClick={() => updateAgent(node.id, { skills: d.skills.filter((x) => x !== s) })}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        {d.skills.length === 0 && <span className="slot">none equipped</span>}
+      </div>
+      {unequipped.length > 0 && (
+        <select
+          style={{ marginTop: 6 }}
+          value=""
+          onChange={(e) => {
+            if (e.target.value) updateAgent(node.id, { skills: [...d.skills, e.target.value] })
+          }}
+        >
+          <option value="">+ Equip a skill…</option>
+          {unequipped.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+      )}
       <label>Permission mode</label>
       <select
         value={d.permissionMode}

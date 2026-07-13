@@ -16,6 +16,7 @@ export const api = {
   deleteSkill: (name: string) =>
     fetch(`/api/skills/${encodeURIComponent(name)}`, { method: 'DELETE' }).then(j),
 
+  listWorkflows: () => fetch('/api/workflows').then(j),
   getWorkflow: (id: string) =>
     fetch(`/api/workflows/${encodeURIComponent(id)}`).then((r) =>
       r.status === 404 ? null : j(r)

@@ -20,8 +20,10 @@ export function AgentNode({ id, data, selected }: NodeProps<Node<AgentData>>) {
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     setDropHint(false)
-    const skill = e.dataTransfer.getData('application/x-skill')
+    const skill =
+      e.dataTransfer.getData('application/x-skill') || e.dataTransfer.getData('text/plain')
     if (skill && !data.skills.includes(skill)) {
       updateAgent(id, { skills: [...data.skills, skill] })
     }
@@ -31,10 +33,10 @@ export function AgentNode({ id, data, selected }: NodeProps<Node<AgentData>>) {
     <div
       className={`agent-card ${data.status} ${selected ? 'selected' : ''}`}
       onDragOver={(e) => {
-        if (e.dataTransfer.types.includes('application/x-skill')) {
-          e.preventDefault()
-          setDropHint(true)
-        }
+        e.preventDefault()
+        e.stopPropagation()
+        e.dataTransfer.dropEffect = 'copy'
+        setDropHint(true)
       }}
       onDragLeave={() => setDropHint(false)}
       onDrop={onDrop}

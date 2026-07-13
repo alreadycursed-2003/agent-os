@@ -22,13 +22,15 @@ import { SkillDock } from './components/SkillDock'
 import { SkillEditor } from './components/SkillEditor'
 import { MissionLog, type NodeLog } from './components/MissionLog'
 import { AgentConfig, EdgeConfigPanel, HarnessConfig } from './components/ConfigPanel'
-import { UsagePage, McpPage, PluginsPage, AgentsPage, SettingsPage, StatusPage } from './pages'
+import { UsagePage, McpPage, PluginsPage, AgentsPage, SettingsPage, StatusPage, TemplatePage } from './pages'
+import { TEMPLATES, type SquadTemplate } from './templates'
 
-const WORKFLOW_ID = 'main'
 const nodeTypes = { agent: AgentNode }
 
 const TABS = [
   ['canvas', 'Canvas'],
+  ['council', 'Council'],
+  ['org', 'Org'],
   ['usage', 'Usage'],
   ['mcp', 'MCP'],
   ['plugins', 'Plugins'],
@@ -66,6 +68,8 @@ export default function App() {
   const [selNode, setSelNode] = useState<string | null>(null)
   const [selEdge, setSelEdge] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('canvas')
+  const [wfId, setWfId] = useState('main')
+  const [wfList, setWfList] = useState<string[]>(['main'])
   const loaded = useRef(false)
 
   // edges glow with motion only while a mission is actually running
@@ -73,37 +77,59 @@ export default function App() {
     setEdges((es) => es.map((e) => ({ ...e, animated: !!runId })))
   }, [runId, setEdges])
 
-  // ---- load persisted state ----
-  useEffect(() => {
-    Promise.all([api.listSkills(), api.getWorkflow(WORKFLOW_ID)])
-      .then(([sk, wf]) => {
-        setSkills(sk)
-        if (wf) {
-          setMcpConfig(wf.mcpConfig ?? '')
-          setNodes(
-            (wf.nodes ?? []).map((n: Record<string, unknown>) => ({
-              id: n.id as string,
-              type: 'agent',
-              position: (n.position as { x: number; y: number }) ?? { x: 100, y: 100 },
-              data: { ...freshAgent(), ...n, status: 'idle', detail: undefined } as AgentData,
-            }))
-          )
-          setEdges(
-            (wf.edges ?? []).map((e: EdgeConfig & { id: string; source: string; target: string }) =>
-              decorateEdge({
-                id: e.id,
-                source: e.source,
-                target: e.target,
-                data: { loop: e.loop, maxLoops: e.maxLoops, until: e.until },
-              })
-            )
-          )
-          agentSeq = (wf.nodes ?? []).length
-        }
-        loaded.current = true
+  const refreshWfList = useCallback(() => {
+    api
+      .listWorkflows()
+      .then((ws: { id: string }[]) => {
+        const ids = ws.map((w) => w.id)
+        for (const t of TEMPLATES) if (!ids.includes(t.id)) ids.push(t.id)
+        if (!ids.includes('main')) ids.unshift('main')
+        setWfList(ids)
       })
-      .catch((err) => setRunState(`SERVER OFFLINE — ${err.message}`))
-  }, [setNodes, setEdges])
+      .catch(() => {})
+  }, [])
+
+  const loadWorkflow = useCallback(
+    async (id: string) => {
+      loaded.current = false
+      const wf = await api.getWorkflow(id)
+      setMcpConfig(wf?.mcpConfig ?? '')
+      setNodes(
+        (wf?.nodes ?? []).map((n: Record<string, unknown>) => ({
+          id: n.id as string,
+          type: 'agent',
+          position: (n.position as { x: number; y: number }) ?? { x: 100, y: 100 },
+          data: { ...freshAgent(), ...n, status: 'idle', detail: undefined } as AgentData,
+        }))
+      )
+      setEdges(
+        (wf?.edges ?? []).map(
+          (e: EdgeConfig & { id: string; source: string; target: string }) =>
+            decorateEdge({
+              id: e.id,
+              source: e.source,
+              target: e.target,
+              data: { loop: e.loop, maxLoops: e.maxLoops, until: e.until },
+            })
+        )
+      )
+      agentSeq = wf?.nodes?.length ?? 0
+      setSelNode(null)
+      setSelEdge(null)
+      setLogs(new Map())
+      loaded.current = true
+    },
+    [setNodes, setEdges]
+  )
+
+  useEffect(() => {
+    api.listSkills().then(setSkills).catch(() => {})
+    refreshWfList()
+  }, [refreshWfList])
+
+  useEffect(() => {
+    loadWorkflow(wfId).catch((err) => setRunState(`SERVER OFFLINE — ${err.message}`))
+  }, [wfId, loadWorkflow])
 
   // ---- persist (debounced) ----
   useEffect(() => {
@@ -111,8 +137,8 @@ export default function App() {
     const t = setTimeout(() => {
       api
         .saveWorkflow({
-          id: WORKFLOW_ID,
-          name: 'Main Mission',
+          id: wfId,
+          name: wfId,
           mcpConfig,
           nodes: nodes.map((n) => {
             const { status: _s, detail: _d, ...rest } = n.data
@@ -130,7 +156,7 @@ export default function App() {
         .catch(() => {})
     }, 700)
     return () => clearTimeout(t)
-  }, [nodes, edges, mcpConfig])
+  }, [nodes, edges, mcpConfig, wfId])
 
   // ---- live events ----
   useEffect(() => {
@@ -179,7 +205,9 @@ export default function App() {
         setRunState(`ERROR — ${ev.error}`)
         setRunId(null)
         setNodes((ns) =>
-          ns.map((n) => (n.data.status === 'running' ? { ...n, data: { ...n.data, status: 'error' } } : n))
+          ns.map((n) =>
+            n.data.status === 'running' ? { ...n, data: { ...n.data, status: 'error' } } : n
+          )
         )
       }
     })
@@ -214,7 +242,9 @@ export default function App() {
 
   const onConnect = useCallback(
     (c: Connection) =>
-      setEdges((es) => addEdge(decorateEdge({ ...c, id: `e-${Date.now().toString(36)}`, data: {} }), es)),
+      setEdges((es) =>
+        addEdge(decorateEdge({ ...c, id: `e-${Date.now().toString(36)}`, data: {} }), es)
+      ),
     [setEdges]
   )
 
@@ -226,14 +256,14 @@ export default function App() {
   // ---- run controls ----
   const launch = async () => {
     setLogs(
-      new Map(
-        nodes.map((n) => [n.id, { name: n.data.name, status: 'idle', lines: [] } as NodeLog])
-      )
+      new Map(nodes.map((n) => [n.id, { name: n.data.name, status: 'idle', lines: [] } as NodeLog]))
     )
-    setNodes((ns) => ns.map((n) => ({ ...n, data: { ...n.data, status: 'idle', detail: undefined } })))
+    setNodes((ns) =>
+      ns.map((n) => ({ ...n, data: { ...n.data, status: 'idle', detail: undefined } }))
+    )
     setRunState('RUNNING')
     try {
-      const { runId } = await api.run(WORKFLOW_ID, mission || 'Do your job.')
+      const { runId } = await api.run(wfId, mission || 'Do your job.')
       setRunId(runId)
     } catch (err) {
       setRunState(`LAUNCH FAILED — ${(err as Error).message}`)
@@ -244,7 +274,7 @@ export default function App() {
 
   const generateFiles = async () => {
     try {
-      const r = await api.generate(WORKFLOW_ID)
+      const r = await api.generate(wfId)
       setRunState(`FILES FORGED → ${r.written.length} in ${r.dir}`)
     } catch (err) {
       setRunState(`GENERATE FAILED — ${(err as Error).message}`)
@@ -267,6 +297,38 @@ export default function App() {
           : n
       )
     )
+  }
+
+  const equipSkill = (name: string) => {
+    if (!selNode) {
+      setRunState('Select an agent first, then click a skill to equip it.')
+      return
+    }
+    const node = nodes.find((n) => n.id === selNode)
+    if (node && !node.data.skills.includes(name)) {
+      boardApi.updateAgent(selNode, { skills: [...node.data.skills, name] })
+    }
+  }
+
+  const deployTemplate = async (t: SquadTemplate) => {
+    await api.saveWorkflow({
+      id: t.id,
+      name: t.title,
+      mcpConfig: '',
+      nodes: t.nodes.map((n) => ({ id: n.id, position: n.position, ...n.data })),
+      edges: t.edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        loop: e.loop ?? false,
+        maxLoops: e.maxLoops ?? 3,
+        until: e.until ?? '',
+      })),
+    })
+    refreshWfList()
+    if (wfId === t.id) await loadWorkflow(t.id)
+    else setWfId(t.id)
+    setTab('canvas')
   }
 
   const selectedNode = nodes.find((n) => n.id === selNode) ?? null
@@ -295,6 +357,8 @@ export default function App() {
         <div className="stage">
           {tab !== 'canvas' &&
             {
+              council: <TemplatePage t={TEMPLATES[0]} onDeploy={deployTemplate} />,
+              org: <TemplatePage t={TEMPLATES[1]} onDeploy={deployTemplate} />,
               usage: <UsagePage />,
               mcp: <McpPage />,
               plugins: <PluginsPage />,
@@ -305,6 +369,18 @@ export default function App() {
 
           <div className="canvas-tab" style={{ display: tab === 'canvas' ? 'flex' : 'none' }}>
             <div className="toolbar">
+              <select
+                className="wf-select"
+                value={wfId}
+                title="Workflow"
+                onChange={(e) => setWfId(e.target.value)}
+              >
+                {wfList.map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+              </select>
               <button className="btn" onClick={addAgent}>
                 + Add agent
               </button>
@@ -315,7 +391,11 @@ export default function App() {
                 onChange={(e) => setMission(e.target.value)}
               />
               <div className="spacer" />
-              <button className="btn btn-ghost" onClick={generateFiles} title="Export .claude/agents + skills">
+              <button
+                className="btn btn-ghost"
+                onClick={generateFiles}
+                title="Export .claude/agents + skills"
+              >
                 Forge files
               </button>
               {runId ? (
@@ -336,6 +416,7 @@ export default function App() {
                   onForge={() => setEditing('new')}
                   onEdit={(s) => setEditing(s)}
                   onDelete={deleteSkill}
+                  onEquip={equipSkill}
                 />
               </aside>
 
@@ -345,8 +426,9 @@ export default function App() {
                     <div className="empty-card">
                       <strong>Build your squad</strong>
                       <p>
-                        Add an agent, give it a prompt, drag skills onto it from the left, wire
-                        agents together, then run the mission.
+                        Add an agent, give it a prompt, equip skills from the left, wire agents
+                        together, then run the mission. Or deploy a ready squad from the Council or
+                        Org tab.
                       </p>
                       <button className="btn btn-run" onClick={addAgent}>
                         + Add your first agent
@@ -381,15 +463,15 @@ export default function App() {
 
               <aside className="panel panel-right">
                 {selectedNode ? (
-                  <AgentConfig node={selectedNode} />
+                  <AgentConfig node={selectedNode} allSkills={skills.map((s) => s.name)} />
                 ) : selectedEdge ? (
                   <EdgeConfigPanel edge={selectedEdge} onChange={updateEdge} />
                 ) : (
                   <>
                     <h2>Inspector</h2>
                     <div className="dock-empty" style={{ padding: '0 14px' }}>
-                      Select an agent to edit its model, tools, permissions and loops. Select a
-                      connection to make it a loop.
+                      Select an agent to edit its model, tools, skills, permissions and loops.
+                      Select a connection to make it a loop.
                     </div>
                     <HarnessConfig mcpConfig={mcpConfig} onMcp={setMcpConfig} />
                   </>

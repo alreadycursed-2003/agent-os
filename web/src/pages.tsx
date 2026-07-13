@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { SquadTemplate } from './templates'
 
 interface CliResult {
   ok: boolean
@@ -466,49 +467,343 @@ export function AgentsPage() {
   )
 }
 
-// ---------------- Settings ----------------
+// ---------------- Squad templates (Council / Org) ----------------
 
-export function SettingsPage() {
-  const [path, setPath] = useState('')
-  const [content, setContent] = useState('')
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+export function TemplatePage({
+  t,
+  onDeploy,
+}: {
+  t: SquadTemplate
+  onDeploy: (t: SquadTemplate) => Promise<void>
+}) {
+  const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
-    get('/api/settings').then((r) => {
-      setPath(r.path)
-      setContent(r.content || '{\n}\n')
-    })
-  }, [])
-
-  const saveSettings = async () => {
+  const deploy = async () => {
+    setBusy(true)
     try {
-      const r = await send('/api/settings', 'PUT', { content })
-      setMsg({ ok: true, text: `Saved. Backup written to ${r.backup}` })
-    } catch (err) {
-      setMsg({ ok: false, text: (err as Error).message })
+      await onDeploy(t)
+    } finally {
+      setBusy(false)
     }
   }
 
   return (
     <div className="page">
+      <h1>{t.title}</h1>
+      <p className="sub">{t.tagline}</p>
+      <div className="tmpl-actions">
+        <button className="btn btn-run" disabled={busy} onClick={deploy}>
+          {busy ? 'Deploying…' : `Deploy ${t.title} to canvas`}
+        </button>
+        <span className="dock-empty">
+          Creates the “{t.id}” workflow (overwrites it if it exists) and opens it on the Canvas —
+          every member stays fully editable there.
+        </span>
+      </div>
+      <section>
+        <h3>How it runs</h3>
+        <p className="sub" style={{ marginBottom: 0 }}>{t.how}</p>
+      </section>
+      <section>
+        <h3>Members</h3>
+        <div className="tmpl-grid">
+          {t.nodes.map((n) => (
+            <div key={n.id} className="tmpl-card">
+              <div className="tmpl-head">
+                <span className="tmpl-avatar">{n.data.avatar}</span>
+                <div>
+                  <div className="tmpl-name">{n.data.name}</div>
+                  <div className="tmpl-role">{n.role}</div>
+                </div>
+              </div>
+              <p className="tmpl-prompt">{n.data.prompt}</p>
+              <div className="tmpl-meta">
+                {n.data.tools.length ? `tools: ${n.data.tools.join(', ')}` : 'no tools — pure reasoning'}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+      <section>
+        <h3>Chain of command</h3>
+        <pre className="console">
+          {t.edges
+            .map((e) => {
+              const s = t.nodes.find((n) => n.id === e.source)?.data.name
+              const d = t.nodes.find((n) => n.id === e.target)?.data.name
+              return e.loop ? `${s} ⟲ ${d}  (loop ×${e.maxLoops}${e.until ? ` until "${e.until}"` : ''})` : `${s} → ${d}`
+            })
+            .join('\n')}
+        </pre>
+      </section>
+    </div>
+  )
+}
+
+// ---------------- Settings ----------------
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export function SettingsPage() {
+  const [path, setPath] = useState('')
+  const [obj, setObj] = useState<any>(null)
+  const [raw, setRaw] = useState('')
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  useEffect(() => {
+    get('/api/settings').then((r) => {
+      setPath(r.path)
+      let parsed: any = {}
+      try {
+        parsed = JSON.parse(r.content || '{}')
+      } catch {
+        setMsg({ ok: false, text: 'Existing file is not valid JSON — fix it in Advanced below.' })
+      }
+      setObj(parsed)
+      setRaw(JSON.stringify(parsed, null, 2))
+    })
+  }, [])
+
+  const patch = (fn: (o: any) => void) => {
+    setMsg(null)
+    setObj((prev: any) => {
+      const next = structuredClone(prev ?? {})
+      fn(next)
+      setRaw(JSON.stringify(next, null, 2))
+      return next
+    })
+  }
+
+  const save = async (content: string) => {
+    try {
+      const r = await send('/api/settings', 'PUT', { content })
+      setMsg({ ok: true, text: `Saved. Backup at ${r.backup}` })
+    } catch (err) {
+      setMsg({ ok: false, text: (err as Error).message })
+    }
+  }
+
+  if (obj === null) return <div className="page"><h1>Settings</h1></div>
+
+  const perms = obj.permissions ?? {}
+  const linesToArr = (v: string) => v.split('\n').map((x) => x.trim()).filter(Boolean)
+  const envLines = Object.entries(obj.env ?? {})
+    .map(([k, v]) => `${k}=${v}`)
+    .join('\n')
+
+  return (
+    <div className="page">
       <h1>Settings</h1>
       <p className="sub">
-        Your global Claude Code settings file — <code>{path}</code>. Applies to every session on
-        this machine, not just this app. A <code>.bak</code> backup is written before each save.
+        Global Claude Code settings — <code>{path}</code>. Applies to every Claude Code session on
+        this machine. A <code>.bak</code> backup is written before each save.
       </p>
-      <textarea
-        className="raw"
-        value={content}
-        spellCheck={false}
-        onChange={(e) => {
-          setContent(e.target.value)
-          setMsg(null)
-        }}
-      />
-      <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center' }}>
-        <button className="btn btn-run" onClick={saveSettings}>Save settings</button>
-        {msg && <span className={msg.ok ? 'note-ok' : 'note-err'}>{msg.text}</span>}
-      </div>
+
+      <section className="set-form">
+        <div className="form-row">
+          <div>
+            <label>Default model</label>
+            <select
+              value={obj.model ?? ''}
+              onChange={(e) =>
+                patch((o) => {
+                  if (e.target.value) o.model = e.target.value
+                  else delete o.model
+                })
+              }
+            >
+              <option value="">auto (recommended)</option>
+              <option value="sonnet">sonnet</option>
+              <option value="opus">opus</option>
+              <option value="haiku">haiku</option>
+            </select>
+          </div>
+          <div>
+            <label>Default permission mode</label>
+            <select
+              value={perms.defaultMode ?? ''}
+              onChange={(e) =>
+                patch((o) => {
+                  o.permissions ??= {}
+                  if (e.target.value) o.permissions.defaultMode = e.target.value
+                  else delete o.permissions.defaultMode
+                })
+              }
+            >
+              <option value="">default (ask)</option>
+              <option value="acceptEdits">acceptEdits</option>
+              <option value="plan">plan</option>
+              <option value="bypassPermissions">bypassPermissions</option>
+            </select>
+          </div>
+          <div>
+            <label>Chat cleanup (days)</label>
+            <input
+              type="number"
+              min={1}
+              value={obj.cleanupPeriodDays ?? ''}
+              placeholder="30"
+              onChange={(e) =>
+                patch((o) => {
+                  if (e.target.value) o.cleanupPeriodDays = Number(e.target.value)
+                  else delete o.cleanupPeriodDays
+                })
+              }
+            />
+          </div>
+        </div>
+
+        <div className="form-row set-toggles">
+          <label>
+            <input
+              type="checkbox"
+              checked={obj.includeCoAuthoredBy !== false}
+              onChange={(e) =>
+                patch((o) => {
+                  if (e.target.checked) delete o.includeCoAuthoredBy
+                  else o.includeCoAuthoredBy = false
+                })
+              }
+            />
+            Co-authored-by on commits
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={obj.autoUpdates !== false}
+              onChange={(e) =>
+                patch((o) => {
+                  if (e.target.checked) delete o.autoUpdates
+                  else o.autoUpdates = false
+                })
+              }
+            />
+            Auto-updates
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={obj.alwaysThinkingEnabled === true}
+              onChange={(e) =>
+                patch((o) => {
+                  if (e.target.checked) o.alwaysThinkingEnabled = true
+                  else delete o.alwaysThinkingEnabled
+                })
+              }
+            />
+            Extended thinking by default
+          </label>
+        </div>
+
+        <div className="form-row" style={{ alignItems: 'stretch' }}>
+          <div style={{ flex: 1 }}>
+            <label>Always-allowed tools (one rule per line, e.g. Bash(npm run test:*))</label>
+            <textarea
+              className="raw set-lines"
+              value={(perms.allow ?? []).join('\n')}
+              spellCheck={false}
+              onChange={(e) =>
+                patch((o) => {
+                  o.permissions ??= {}
+                  const arr = linesToArr(e.target.value)
+                  if (arr.length) o.permissions.allow = arr
+                  else delete o.permissions.allow
+                })
+              }
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label>Always-denied tools (one rule per line)</label>
+            <textarea
+              className="raw set-lines"
+              value={(perms.deny ?? []).join('\n')}
+              spellCheck={false}
+              onChange={(e) =>
+                patch((o) => {
+                  o.permissions ??= {}
+                  const arr = linesToArr(e.target.value)
+                  if (arr.length) o.permissions.deny = arr
+                  else delete o.permissions.deny
+                })
+              }
+            />
+          </div>
+        </div>
+
+        <div className="form-row" style={{ alignItems: 'stretch' }}>
+          <div style={{ flex: 1 }}>
+            <label>Environment variables (KEY=value per line)</label>
+            <textarea
+              className="raw set-lines"
+              value={envLines}
+              spellCheck={false}
+              onChange={(e) =>
+                patch((o) => {
+                  const env: Record<string, string> = {}
+                  for (const line of e.target.value.split('\n')) {
+                    const i = line.indexOf('=')
+                    if (i > 0) env[line.slice(0, i).trim()] = line.slice(i + 1).trim()
+                  }
+                  if (Object.keys(env).length) o.env = env
+                  else delete o.env
+                })
+              }
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label>Status line command (blank = none)</label>
+            <input
+              style={{ width: '100%' }}
+              value={obj.statusLine?.command ?? ''}
+              onChange={(e) =>
+                patch((o) => {
+                  if (e.target.value) o.statusLine = { type: 'command', command: e.target.value }
+                  else delete o.statusLine
+                })
+              }
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 12 }}>
+          <button className="btn btn-run" onClick={() => save(JSON.stringify(obj, null, 2))}>
+            Save settings
+          </button>
+          {msg && <span className={msg.ok ? 'note-ok' : 'note-err'}>{msg.text}</span>}
+        </div>
+      </section>
+
+      <section>
+        <details>
+          <summary style={{ cursor: 'pointer', fontWeight: 700, marginBottom: 8 }}>
+            Advanced: raw JSON (full file, including keys not shown above)
+          </summary>
+          <textarea
+            className="raw"
+            value={raw}
+            spellCheck={false}
+            onChange={(e) => {
+              setRaw(e.target.value)
+              setMsg(null)
+            }}
+          />
+          <div style={{ marginTop: 8 }}>
+            <button
+              className="btn"
+              onClick={() => {
+                try {
+                  const parsed = JSON.parse(raw)
+                  setObj(parsed)
+                  save(JSON.stringify(parsed, null, 2))
+                } catch (err) {
+                  setMsg({ ok: false, text: `Invalid JSON: ${(err as Error).message}` })
+                }
+              }}
+            >
+              Save raw JSON
+            </button>
+          </div>
+        </details>
+      </section>
     </div>
   )
 }

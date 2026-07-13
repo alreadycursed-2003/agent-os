@@ -5,11 +5,13 @@ export function SkillDock({
   onForge,
   onEdit,
   onDelete,
+  onEquip,
 }: {
   skills: Skill[]
   onForge: () => void
   onEdit: (s: Skill) => void
   onDelete: (name: string) => void
+  onEquip: (name: string) => void
 }) {
   return (
     <>
@@ -30,9 +32,11 @@ export function SkillDock({
             draggable
             onDragStart={(e) => {
               e.dataTransfer.setData('application/x-skill', s.name)
+              e.dataTransfer.setData('text/plain', s.name)
               e.dataTransfer.effectAllowed = 'copy'
             }}
-            title="Drag onto an agent to equip"
+            onClick={() => onEquip(s.name)}
+            title="Drag onto an agent card, or select an agent and click to equip"
           >
             <span className="s-dot" />
             <div style={{ minWidth: 0 }}>

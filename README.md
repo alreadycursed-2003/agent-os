@@ -11,6 +11,9 @@ Done:
 - 🗂 Tabs for the Claude Code surfaces: **Usage** (token ledger per run), **MCP** (add/remove servers via `claude mcp`), **Plugins** (marketplaces + install via `claude plugin`), **Agents** (every agent definition on disk), **Settings** (edit `~/.claude/settings.json` with auto-backup), **Status** (CLI health + Connect Claude account)
 - 🛒 Marketplace catalog: 7 curated marketplaces (Anthropic official, Anthropic Agent Skills, Claude Code Workflows, Superpowers, CC Marketplace, Every, Plugins Plus — 1,300+ plugins combined) browsable with search and one-click install
 - 🔑 Connect account: Status tab button launches Claude Code's own OAuth login (`claude setup-token`), which redirects to claude.ai sign-in — no API key ever
+- 🏛 Squad templates: **Council** (Sage, Strategist, Skeptic, Pragmatist, Advocate → Chair rules) and **Org** (CEO → PM → Architect → Engineer → QA with an APPROVED review loop) — one click deploys either to its own workflow on the canvas
+- 🔀 Workflow switcher on the canvas toolbar; skills equip via drag-drop, click-to-equip, or the inspector picker
+- 🎛 Settings is a real form now: model, permission mode, allow/deny rules, env vars, status line, toggles — raw JSON kept under Advanced
 - 🤖 Per-agent config: system prompt, model (auto/sonnet/opus/haiku), allowed tools, permission mode, max turns
 - ⚡ Skill forge: create/edit skills, equip per agent (inlined into system prompt + exported as `.claude/skills/`)
 - 🔁 Loops: self-loop per agent (repeat ×N, stop-when-output-contains) and loop-back edges between agents (max loops + until-condition)

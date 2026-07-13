@@ -530,6 +530,68 @@ pre.console {
 .note-ok { color: var(--ok); font-size: 14px; }
 .note-err { color: var(--err); font-size: 14px; }
 
+/* workflow selector */
+.wf-select {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 7px 9px;
+  outline: none;
+  max-width: 150px;
+}
+.wf-select:focus { border-color: var(--accent); }
+
+/* squad templates */
+.tmpl-actions { display: flex; gap: 14px; align-items: center; margin-bottom: 22px; flex-wrap: wrap; }
+.tmpl-actions .dock-empty { max-width: 52ch; }
+.tmpl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  max-width: 1100px;
+}
+.tmpl-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+}
+.tmpl-head { display: flex; align-items: center; gap: 10px; }
+.tmpl-avatar {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.tmpl-name { font-size: 15px; font-weight: 700; }
+.tmpl-role { font-size: 13px; color: var(--accent); font-weight: 600; }
+.tmpl-prompt { font-size: 13.5px; color: var(--ink-mute); line-height: 1.5; margin: 10px 0; flex: 1; }
+.tmpl-meta { font-size: 12.5px; color: var(--ink-mute); border-top: 1px solid var(--line); padding-top: 8px; }
+
+/* settings form */
+.set-form .set-lines { min-height: 90px; }
+.set-toggles { gap: 22px; margin: 14px 0; }
+.set-toggles label {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+.set-toggles input { accent-color: var(--accent); }
+
 /* marketplace catalog */
 .mkt-card {
   background: var(--surface);
