@@ -578,20 +578,6 @@ pre.console {
 .tmpl-prompt { font-size: 13.5px; color: var(--ink-mute); line-height: 1.5; margin: 10px 0; flex: 1; }
 .tmpl-meta { font-size: 12.5px; color: var(--ink-mute); border-top: 1px solid var(--line); padding-top: 8px; }
 
-/* settings form */
-.set-form .set-lines { min-height: 90px; }
-.set-toggles { gap: 22px; margin: 14px 0; }
-.set-toggles label {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink);
-  cursor: pointer;
-}
-.set-toggles input { accent-color: var(--accent); }
-
 /* marketplace catalog */
 .mkt-card {
   background: var(--surface);
